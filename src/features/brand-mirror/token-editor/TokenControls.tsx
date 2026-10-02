@@ -1,10 +1,13 @@
-import type { BrandMirrorSnapshot, BrandTheme } from '../models/brandMirrorModels'
+import type { BrandMirrorSnapshot, BrandTheme, ScaleField } from '../models/brandMirrorModels'
+import { SCALE_LIMITS } from '../models/brandMirrorModels'
 
 interface TokenControlsProps {
   snapshot: BrandMirrorSnapshot
   onThemeChange: (theme: BrandTheme) => void
   onColorChange: (field: 'primary' | 'secondary', value: string) => void
-  onScaleChange: (field: 'radiusScale' | 'spacingScale' | 'typeScale', index: number, value: number) => void
+  onScaleChange: (field: ScaleField, index: number, value: number) => void
+  onAddTier: (field: ScaleField, at?: number) => void
+  onRemoveTier: (field: ScaleField, at: number) => void
   onReset: () => void
 }
 
@@ -14,7 +17,13 @@ const themes: { id: BrandTheme; label: string; note: string }[] = [
   { id: 'night', label: 'Night signal', note: '锐利 · 数字' },
 ]
 
-export function TokenControls({ snapshot, onThemeChange, onColorChange, onScaleChange, onReset }: TokenControlsProps) {
+const SCALE_ORDER: { field: ScaleField; label: string }[] = [
+  { field: 'radiusScale', label: '圆角尺度' },
+  { field: 'spacingScale', label: '间距体系' },
+  { field: 'typeScale', label: '字体比例' },
+]
+
+export function TokenControls({ snapshot, onThemeChange, onColorChange, onScaleChange, onAddTier, onRemoveTier, onReset }: TokenControlsProps) {
   return (
     <aside className="control-panel">
       <div className="panel-heading">
@@ -50,9 +59,17 @@ export function TokenControls({ snapshot, onThemeChange, onColorChange, onScaleC
         </div>
       </section>
 
-      <ScaleControl label="圆角尺度" hint="px" values={snapshot.tokens.radiusScale} field="radiusScale" onChange={onScaleChange} />
-      <ScaleControl label="间距体系" hint="px" values={snapshot.tokens.spacingScale} field="spacingScale" onChange={onScaleChange} />
-      <ScaleControl label="字体比例" hint="px" values={snapshot.tokens.typeScale} field="typeScale" onChange={onScaleChange} />
+      {SCALE_ORDER.map(({ field, label }) => (
+        <ScaleControl
+          key={field}
+          label={label}
+          values={snapshot.tokens[field]}
+          field={field}
+          onChange={onScaleChange}
+          onAddTier={onAddTier}
+          onRemoveTier={onRemoveTier}
+        />
+      ))}
 
       <div className="panel-footer"><span className="live-dot" />所有调整实时同步到预览</div>
     </aside>
@@ -63,6 +80,60 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
   return <label className="color-field"><span>{label}</span><div className="color-input"><input aria-label={label} type="color" value={value} onChange={(event) => onChange(event.target.value)} /><input aria-label={`${label} HEX`} value={value} onChange={(event) => onChange(event.target.value)} /></div></label>
 }
 
-function ScaleControl({ label, hint, values, field, onChange }: { label: string; hint: string; values: number[]; field: 'radiusScale' | 'spacingScale' | 'typeScale'; onChange: (field: 'radiusScale' | 'spacingScale' | 'typeScale', index: number, value: number) => void }) {
-  return <section className="control-section scale-section"><div className="section-label"><span>{label}</span><span className="muted">{hint}</span></div><div className="scale-inputs">{values.map((value, index) => <label key={`${field}-${index}`}><span>{index + 1}</span><input aria-label={`${label}${index + 1}`} type="number" min={field === 'typeScale' ? 10 : 0} max={field === 'typeScale' ? 72 : field === 'spacingScale' ? 64 : 40} value={value} onChange={(event) => onChange(field, index, Number(event.target.value))} /></label>)}</div></section>
+interface ScaleControlProps {
+  label: string
+  values: number[]
+  field: ScaleField
+  onChange: (field: ScaleField, index: number, value: number) => void
+  onAddTier: (field: ScaleField, at?: number) => void
+  onRemoveTier: (field: ScaleField, at: number) => void
+}
+
+function ScaleControl({ label, values, field, onChange, onAddTier, onRemoveTier }: ScaleControlProps) {
+  const limits = SCALE_LIMITS[field]
+  const valueBounds = { min: field === 'typeScale' ? 10 : 0, max: field === 'radiusScale' ? 40 : field === 'spacingScale' ? 64 : 72 }
+  return (
+    <section className="control-section scale-section">
+      <div className="section-label"><span>{label}</span><span className="muted">{values.length} 档 · {limits.min}–{limits.max}</span></div>
+      <div className="scale-rows">
+        {values.map((value, index) => (
+          <div className="scale-row" key={`${field}-${index}`}>
+            <label className="scale-cell">
+              <span>{index + 1}</span>
+              <input
+                aria-label={`${label}${index + 1}`}
+                type="number"
+                min={valueBounds.min}
+                max={valueBounds.max}
+                value={value}
+                onChange={(event) => onChange(field, index, Number(event.target.value))}
+              />
+            </label>
+            <div className="scale-row-actions">
+              <button
+                aria-label={`在第 ${index + 1} 档前插入层级`}
+                className="scale-icon-button"
+                type="button"
+                disabled={values.length >= limits.max}
+                onClick={() => onAddTier(field, index)}
+              >＋</button>
+              <button
+                aria-label={`删除第 ${index + 1} 档`}
+                className="scale-icon-button remove"
+                type="button"
+                disabled={values.length <= limits.min}
+                onClick={() => onRemoveTier(field, index)}
+              >−</button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <button
+        className="add-tier-button"
+        type="button"
+        disabled={values.length >= limits.max}
+        onClick={() => onAddTier(field)}
+      >＋ 新增层级</button>
+    </section>
+  )
 }

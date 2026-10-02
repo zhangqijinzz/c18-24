@@ -1,7 +1,7 @@
-import { clampTokenValues, cloneTokens, contrastRatio, normalizeColor, themeTokens, validateTokens } from '../domain/brandRules'
+import { addScaleTier, clampTokenValues, cloneTokens, contrastRatio, normalizeColor, removeScaleTier, themeTokens, validateTokens } from '../domain/brandRules'
 import type { BrandRepository } from '../repositories/brandRepository'
 import type { BrandGuidelinesExporter } from '../services/exportService'
-import { INITIAL_TOKENS, type BrandDocument, type BrandMirrorSnapshot, type BrandTheme, type SavedVersion } from '../models/brandMirrorModels'
+import { DOCUMENT_VERSION, INITIAL_TOKENS, SCALE_LIMITS, type BrandDocument, type BrandMirrorSnapshot, type BrandTheme, type ScaleField, type SavedVersion } from '../models/brandMirrorModels'
 
 type Listener = () => void
 
@@ -44,10 +44,28 @@ export class BrandMirrorViewModel {
     this.update({ tokens: { ...this.snapshot.tokens, [field]: color } }, '令牌已更新')
   }
 
-  updateScale(field: 'radiusScale' | 'spacingScale' | 'typeScale', index: number, value: number): void {
+  updateScale(field: ScaleField, index: number, value: number): void {
     const values = [...this.snapshot.tokens[field]]
     values[index] = Number.isFinite(value) ? value : values[index]
     this.update({ tokens: clampTokenValues({ ...this.snapshot.tokens, [field]: values }) }, '令牌已更新')
+  }
+
+  addScaleTier(field: ScaleField, at?: number): void {
+    if (this.snapshot.tokens[field].length >= SCALE_LIMITS[field].max) {
+      this.snapshot = { ...this.snapshot, status: 'error', message: `${SCALE_LIMITS[field].label}最多支持 ${SCALE_LIMITS[field].max} 档` }
+      this.emit()
+      return
+    }
+    this.update({ tokens: addScaleTier(this.snapshot.tokens, field, at) }, '已新增一个层级，预览已同步')
+  }
+
+  removeScaleTier(field: ScaleField, at: number): void {
+    if (this.snapshot.tokens[field].length <= SCALE_LIMITS[field].min) {
+      this.snapshot = { ...this.snapshot, status: 'error', message: `${SCALE_LIMITS[field].label}至少保留 ${SCALE_LIMITS[field].min} 档` }
+      this.emit()
+      return
+    }
+    this.update({ tokens: removeScaleTier(this.snapshot.tokens, field, at) }, '已删除一个层级，预览按位置重新取值')
   }
 
   reset(): void {
@@ -95,7 +113,7 @@ export class BrandMirrorViewModel {
 
   private persistCurrent(): void {
     try {
-      this.repository.save({ version: 1, tokens: this.snapshot.tokens, theme: this.snapshot.theme, versions: this.snapshot.versions })
+      this.repository.save({ version: DOCUMENT_VERSION, tokens: this.snapshot.tokens, theme: this.snapshot.theme, versions: this.snapshot.versions })
     } catch {
       this.snapshot = { ...this.snapshot, status: 'error', message: '本地保存失败，但当前编辑仍保留在页面中' }
     }
@@ -104,7 +122,7 @@ export class BrandMirrorViewModel {
 
   private persist(document: Omit<BrandDocument, 'version'>, message: string): void {
     try {
-      this.repository.save({ version: 1, ...document })
+      this.repository.save({ version: DOCUMENT_VERSION, ...document })
       this.snapshot = this.makeSnapshot(document, message, 'ready')
     } catch {
       this.snapshot = { ...this.snapshot, status: 'error', message: '版本保存失败，请稍后重试' }

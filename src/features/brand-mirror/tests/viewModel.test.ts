@@ -69,4 +69,58 @@ describe('BrandMirrorViewModel', () => {
     expect(exporter.received).toContain('`primary`')
     expect(viewModel.getSnapshot().message).toContain('导出')
   })
+
+  it('adds and removes scale tiers, persists them and reflects the new count in exports', () => {
+    const repository = new MemoryRepository()
+    const exporter = new MemoryExporter()
+    const viewModel = new BrandMirrorViewModel(repository, exporter)
+    viewModel.initialize()
+    viewModel.addScaleTier('radiusScale')
+    expect(viewModel.getSnapshot().tokens.radiusScale).toHaveLength(5)
+    expect(repository.document?.tokens.radiusScale).toHaveLength(5)
+    expect(repository.document?.version).toBe(2)
+
+    viewModel.removeScaleTier('typeScale', 0)
+    expect(viewModel.getSnapshot().tokens.typeScale).toEqual([14, 16, 20, 28, 40])
+
+    viewModel.exportBrandGuidelines()
+    expect(exporter.received).toContain('圆角尺度（5 档）')
+    expect(exporter.received).toContain('`radius.5`')
+    expect(exporter.received).toContain('字体比例（5 档）')
+  })
+
+  it('inserts a tier at a specific position so later tiers keep their values', () => {
+    const repository = new MemoryRepository()
+    const viewModel = new BrandMirrorViewModel(repository)
+    viewModel.initialize()
+    viewModel.addScaleTier('spacingScale', 2)
+    expect(viewModel.getSnapshot().tokens.spacingScale).toEqual([4, 8, 12, 12, 20, 32])
+  })
+
+  it('guards tier count limits', () => {
+    const repository = new MemoryRepository()
+    const viewModel = new BrandMirrorViewModel(repository)
+    viewModel.initialize()
+    for (let i = 0; i < 10; i += 1) viewModel.addScaleTier('radiusScale')
+    expect(viewModel.getSnapshot().tokens.radiusScale).toHaveLength(8)
+    const single = { ...viewModel.getSnapshot().tokens, radiusScale: [10] }
+    repository.document = { version: 2, theme: 'studio', tokens: single, versions: [] }
+    viewModel.initialize()
+    viewModel.removeScaleTier('radiusScale', 0)
+    expect(viewModel.getSnapshot().tokens.radiusScale).toEqual([10])
+  })
+
+  it('compares saved versions position-by-position when tier counts differ', () => {
+    const repository = new MemoryRepository()
+    const viewModel = new BrandMirrorViewModel(repository)
+    viewModel.initialize()
+    viewModel.saveVersion()
+    viewModel.addScaleTier('radiusScale')
+    viewModel.updateScale('radiusScale', 1, 16)
+    viewModel.saveVersion()
+    const [versionA, versionB] = viewModel.getSnapshot().versions
+    expect(versionA.tokens.radiusScale).toHaveLength(4)
+    expect(versionB.tokens.radiusScale).toHaveLength(5)
+    expect(versionB.tokens.radiusScale[1]).toBe(16)
+  })
 })

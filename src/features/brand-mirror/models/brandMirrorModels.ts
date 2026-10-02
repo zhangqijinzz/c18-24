@@ -1,6 +1,8 @@
 export type BrandTheme = 'studio' | 'editorial' | 'night'
 export type MirrorStatus = 'loading' | 'ready' | 'editing' | 'error'
 
+export type ScaleField = 'radiusScale' | 'spacingScale' | 'typeScale'
+
 export interface BrandTokens {
   primary: string
   secondary: string
@@ -16,8 +18,11 @@ export interface SavedVersion {
   createdAt: string
 }
 
+/** 文档结构版本：v2 允许每种尺度拥有可变的层级数量；v1 数据仍可被读取迁移 */
+export const DOCUMENT_VERSION = 2
+
 export interface BrandDocument {
-  version: 1
+  version: number
   tokens: BrandTokens
   theme: BrandTheme
   versions: SavedVersion[]
@@ -34,6 +39,15 @@ export interface BrandMirrorSnapshot {
   contrastWarning: boolean
   message: string
 }
+
+/** 每种尺度允许的层级数量区间，品牌可在区间内自由增删 */
+export const SCALE_LIMITS: Record<ScaleField, { min: number; max: number; unit: string; label: string }> = {
+  radiusScale: { min: 1, max: 8, unit: 'px', label: '圆角尺度' },
+  spacingScale: { min: 2, max: 10, unit: 'px', label: '间距体系' },
+  typeScale: { min: 2, max: 10, unit: 'px', label: '字体比例' },
+}
+
+export const SCALE_FIELDS: ScaleField[] = ['radiusScale', 'spacingScale', 'typeScale']
 
 export const INITIAL_TOKENS: BrandTokens = {
   primary: '#F15A47',
