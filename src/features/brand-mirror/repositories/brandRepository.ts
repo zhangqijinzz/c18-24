@@ -1,5 +1,6 @@
-import type { BrandDocument } from '../models/brandMirrorModels'
-import { clampTokenValues, validateTokens } from '../domain/brandRules'
+import { DOCUMENT_VERSION, type BrandDocument } from '../models/brandMirrorModels'
+import { validateTokens } from '../domain/brandRules'
+import { migrateDocument } from '../domain/documentMigration'
 import type { StorageService } from '../services/storageService'
 
 export interface BrandRepository {
@@ -14,9 +15,7 @@ export class LocalBrandRepository implements BrandRepository {
     const raw = this.storage.read()
     if (!raw) return null
     try {
-      const candidate: unknown = JSON.parse(raw)
-      if (!isDocument(candidate)) return null
-      return { ...candidate, tokens: clampTokenValues(candidate.tokens) }
+      return migrateDocument(JSON.parse(raw))
     } catch {
       return null
     }
@@ -25,12 +24,6 @@ export class LocalBrandRepository implements BrandRepository {
   save(document: BrandDocument): void {
     const validationError = validateTokens(document.tokens)
     if (validationError) throw new Error(validationError)
-    this.storage.write(JSON.stringify(document))
+    this.storage.write(JSON.stringify({ ...document, version: DOCUMENT_VERSION }))
   }
-}
-
-function isDocument(value: unknown): value is BrandDocument {
-  if (!value || typeof value !== 'object') return false
-  const candidate = value as Partial<BrandDocument>
-  return candidate.version === 1 && !!candidate.tokens && Array.isArray(candidate.versions) && typeof candidate.theme === 'string'
 }

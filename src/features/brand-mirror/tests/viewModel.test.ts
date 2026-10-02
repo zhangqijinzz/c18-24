@@ -28,6 +28,17 @@ describe('BrandMirrorViewModel', () => {
     expect(repository.document?.tokens.primary).toBe('#123456')
   })
 
+  it('adds and removes scale levels while persisting the new hierarchy', () => {
+    const repository = new MemoryRepository()
+    const viewModel = new BrandMirrorViewModel(repository)
+    viewModel.initialize()
+    viewModel.addScaleLevel('typeScale')
+    expect(viewModel.getSnapshot().tokens.typeScale).toHaveLength(7)
+    expect(repository.document?.version).toBe(2)
+    viewModel.removeScaleLevel('radiusScale', 0)
+    expect(viewModel.getSnapshot().tokens.radiusScale).toEqual([12, 18, 28])
+  })
+
   it('saves two versions and enters comparison mode', () => {
     const repository = new MemoryRepository()
     const viewModel = new BrandMirrorViewModel(repository)
@@ -59,14 +70,25 @@ describe('BrandMirrorViewModel', () => {
     expect(viewModel.getSnapshot().message).toContain('恢复')
   })
 
+  it('loads legacy data with a different number of scale levels', () => {
+    const repository = new MemoryRepository()
+    repository.document = { version: 1, theme: 'studio', tokens: { primary: '#F15A47', secondary: '#24324A', radiusScale: [8, 18], spacingScale: [4, 8, 12, 20, 32, 48], typeScale: [12, 16, 24] }, versions: [] }
+    const viewModel = new BrandMirrorViewModel(repository)
+    viewModel.initialize()
+    expect(viewModel.getSnapshot().tokens.radiusScale).toEqual([8, 18])
+    expect(viewModel.getSnapshot().tokens.typeScale).toEqual([12, 16, 24])
+  })
+
   it('exports the current token system as brand guidelines', () => {
     const repository = new MemoryRepository()
     const exporter = new MemoryExporter()
     const viewModel = new BrandMirrorViewModel(repository, exporter)
     viewModel.initialize()
+    viewModel.addScaleLevel('typeScale')
     viewModel.exportBrandGuidelines()
     expect(exporter.received).toContain('# BrandMirror 品牌规范')
     expect(exporter.received).toContain('`primary`')
+    expect(exporter.received).toContain('字体比例（7 档）')
     expect(viewModel.getSnapshot().message).toContain('导出')
   })
 })

@@ -1,6 +1,8 @@
 export type BrandTheme = 'studio' | 'editorial' | 'night'
 export type MirrorStatus = 'loading' | 'ready' | 'editing' | 'error'
 
+export type ScaleField = 'radiusScale' | 'spacingScale' | 'typeScale'
+
 export interface BrandTokens {
   primary: string
   secondary: string
@@ -17,10 +19,20 @@ export interface SavedVersion {
 }
 
 export interface BrandDocument {
-  version: 1
+  version: 1 | 2
   tokens: BrandTokens
   theme: BrandTheme
   versions: SavedVersion[]
+}
+
+export const DOCUMENT_VERSION = 2
+export const MIN_SCALE_LEVELS = 1
+export const MAX_SCALE_LEVELS = 10
+
+export const SCALE_LIMITS: Record<ScaleField, { min: number; max: number; appendStep: number; unit: string }> = {
+  radiusScale: { min: 0, max: 40, appendStep: 4, unit: 'px' },
+  spacingScale: { min: 2, max: 64, appendStep: 4, unit: 'px' },
+  typeScale: { min: 10, max: 72, appendStep: 4, unit: 'px' },
 }
 
 export interface BrandMirrorSnapshot {
